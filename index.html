@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Book Bank</title>
+<style>
+:root{--blue:#4fc3f7;--green:#81c784;--yellow:#ffd54f;--bg:#f6fbff;--dark:#2c3e50}
+*{box-sizing:border-box}
+body{margin:0;font-family:Segoe UI,Arial;background:var(--bg)}
+.topbar{position:sticky;top:0;background:linear-gradient(90deg,var(--blue),var(--green));padding:14px;z-index:1000}
+.logo{display:flex;gap:10px;justify-content:center;align-items:center;color:#fff;font-size:24px;font-weight:800;cursor:pointer}
+.logo span{width:42px;height:42px;border-radius:50%;background:var(--yellow);display:flex;align-items:center;justify-content:center;color:var(--dark)}
+.categories{display:flex;gap:10px;padding:10px;background:#fff;overflow-x:auto}
+.categories button{border:none;padding:8px 18px;border-radius:20px;background:#e3f2fd;font-weight:bold;cursor:pointer}
+.categories button.active{background:var(--blue);color:#fff}
+.cart-btn{position:fixed;bottom:20px;right:20px;background:var(--yellow);padding:14px 18px;border-radius:30px;font-weight:bold;box-shadow:0 6px 16px rgba(0,0,0,.25);cursor:pointer;z-index:2000}
+.page{display:none;padding:16px}
+.page.active{display:block}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px}
+.card{background:#fff;padding:14px;border-radius:18px;box-shadow:0 6px 14px rgba(0,0,0,.1);text-align:center}
+.card img{width:100%;border-radius:14px}
+.card button{background:var(--blue);color:#fff;border:none;padding:10px;width:100%;border-radius:10px;font-weight:bold;cursor:pointer}
+.stars{display:flex;justify-content:center;gap:4px;font-size:20px;cursor:pointer}
+.star{color:#ccc}.star.active{color:var(--yellow)}
+input,textarea,select{width:100%;padding:10px;margin:8px 0;border-radius:10px;border:1px solid #ccc}
+.buy-btn{background:var(--green);color:#fff;padding:12px;width:100%;border:none;border-radius:12px;font-size:16px;font-weight:bold;cursor:pointer}
+.remove{color:red;cursor:pointer;font-weight:bold}
+.admin-box{background:#fff;padding:16px;border-radius:16px;box-shadow:0 8px 20px rgba(0,0,0,.15)}
+.admin-header{display:flex;justify-content:space-between;align-items:center}
+.admin-header h2{margin:0}
+.stat{background:#e3f2fd;padding:10px;border-radius:12px;margin:6px 0;font-weight:bold}
+.hidden-admin{position:fixed;left:5px;bottom:5px;width:20px;height:20px;opacity:0}
+</style>
+</head>
+<body>
+<div class="topbar"><div class="logo" onclick="goHome()"><span>📚</span>Book Bank</div></div>
+<div class="categories"><button class="active" onclick="filter('all',this)">📚 الكل</button><button onclick="filter('coloring',this)">🎨 كتب تلوين</button><button onclick="filter('article',this)">📘 مقالات</button></div>
+<div class="cart-btn" onclick="openCheckout()">🛒 (<span id="cartCount">0</span>)</div>
+<div id="home" class="page active"><div class="grid" id="products"></div></div>
+<div id="product" class="page"><img id="pImg" style="width:100%;border-radius:18px"><h2 id="pName"></h2><div class="stars" id="productStars"></div><p>السعر: <b><span id="pPrice"></span> جنيه</b></p><button class="buy-btn" onclick="addAndCheckout()">اشترِ الآن</button></div>
+<div id="checkout" class="page"><h2>إتمام الشراء</h2><div id="cartItems"></div><p><b>الإجمالي:</b> <span id="total">0</span> جنيه</p><input id="name" placeholder="الاسم"><input id="phone" placeholder="رقم الهاتف"><textarea id="address" placeholder="العنوان"></textarea><button class="buy-btn" onclick="sendOrder()">تأكيد الطلب</button></div>
+
+<div id="adminLogin" class="page">
+  <div class="admin-box">
+    <h2>لوحة التحكم السرية</h2>
+    <input id="adminUser" placeholder="اسم المستخدم">
+    <input id="adminPass" type="password" placeholder="كلمة المرور">
+    <button class="buy-btn" onclick="loginAdmin()">دخول</button>
+  </div>
+</div>
+
+<div id="admin" class="page">
+  <div class="admin-box">
+    <div class="admin-header">
+      <h2>👑 الأدمن</h2>
+      <button onclick="goHome()">خروج</button>
+    </div>
+    <h3>📊 إحصائيات</h3>
+    <div class="stat">عدد المنتجات: <span id="statProducts"></span></div>
+    <div class="stat">عدد الطلبات: <span id="statOrders"></span></div>
+    <div class="stat">إجمالي المبيعات: <span id="statSales"></span> جنيه</div>
+    <hr>
+    <h3>➕ إضافة / تعديل منتج</h3>
+    <input id="aName" placeholder="اسم المنتج">
+    <input id="aPrice" type="number" placeholder="السعر">
+    <input id="aImg" placeholder="رابط الصورة">
+    <select id="aCat"><option value="coloring">كتاب تلوين</option><option value="article">مقالة</option></select>
+    <button class="buy-btn" onclick="addProduct()">حفظ المنتج</button>
+    <hr>
+    <h3>📦 المنتجات</h3>
+    <div id="adminProducts"></div>
+    <hr>
+    <h3>🧾 الطلبات</h3>
+    <div id="orders"></div>
+  </div>
+</div>
+
+<div class="hidden-admin"></div>
+
+<script>
+const ADMIN_USER='BDR OSMAN';
+const ADMIN_PASS='MostafAa7112011';
+
+let products=JSON.parse(localStorage.getItem('products'))||[
+{id:'animals',name:'كتاب تلوين الحيوانات',price:100,cat:'coloring',img:'Animal_Coloring.jpg'},
+{id:'mosques',name:'كتاب تلوين المساجد',price:30,cat:'coloring',img:'Mosques_Coloring.jpg'},
+{id:'tourism',name:'مقالة سياحية',price:15,cat:'article',img:'Tourism_Article.jpg'}];
+let cart=JSON.parse(localStorage.getItem('cart'))||[];
+let ratings=JSON.parse(localStorage.getItem('ratings'))||{};
+let orders=JSON.parse(localStorage.getItem('orders'))||[];
+let currentProduct={};
+
+function showPage(id){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById(id).classList.add('active')}
+function goHome(){renderProducts();showPage('home')}
+function renderProducts(){let g='';products.forEach(p=>{g+=`<div class='card' data-cat='${p.cat}'><img src='${p.img}'><h3>${p.name}</h3><div class='stars' data-id='${p.id}'></div><p><b>${p.price} جنيه</b></p><button onclick="openProduct('${p.id}','${p.name}',${p.price},'${p.img}')">عرض المنتج</button></div>`});productsDiv.innerHTML=g;document.querySelectorAll('.stars').forEach(s=>renderStars(s,s.dataset.id));cartCount.innerText=cart.length}
+function openProduct(id,name,price,img){currentProduct={id,name,price};pName.innerText=name;pPrice.innerText=price;pImg.src=img;renderStars(productStars,id);showPage('product')}
+function addAndCheckout(){cart.push(currentProduct);localStorage.setItem('cart',JSON.stringify(cart));cartCount.innerText=cart.length;openCheckout()}
+function openCheckout(){renderCheckout();showPage('checkout')}
+function renderCheckout(){let h='',t=0;cart.forEach((i,idx)=>{t+=i.price;h+=`${i.name} - ${i.price}ج <span class='remove' onclick='removeItem(${idx})'>✖</span><br>`});cartItems.innerHTML=h;total.innerText=t}
+function removeItem(i){cart.splice(i,1);localStorage.setItem('cart',JSON.stringify(cart));renderCheckout();cartCount.innerText=cart.length}
+function renderStars(c,id){c.innerHTML='';let r=ratings[id]||0;for(let i=1;i<=5;i++){let s=document.createElement('span');s.innerText='★';s.className='star'+(i<=r?' active':'');s.onclick=()=>{ratings[id]=i;localStorage.setItem('ratings',JSON.stringify(ratings));renderProducts()};c.appendChild(s)}}
+function filter(type,btn){document.querySelectorAll('.categories button').forEach(b=>b.classList.remove('active'));btn.classList.add('active');document.querySelectorAll('.card').forEach(c=>{c.style.display=(type=='all'||c.dataset.cat==type)?'block':'none'})}
+
+function loginAdmin(){if(adminUser.value===ADMIN_USER && adminPass.value===ADMIN_PASS){showPage('admin');renderAdmin()}else alert('بيانات غير صحيحة')}
+function renderAdmin(){statProducts.innerText=products.length;statOrders.innerText=orders.length;let sum=0;orders.forEach(()=>sum+=1);statSales.innerText=sum;let h='';products.forEach((p,i)=>h+=`${p.name} - ${p.price}ج <span class='remove' onclick='del(${i})'>✖</span><br>`);adminProducts.innerHTML=h;ordersDiv='';orders.forEach(o=>ordersDiv+=`<div>${o}</div><hr>`);orders.innerHTML=ordersDiv}
+function addProduct(){products.push({id:Date.now(),name:aName.value,price:+aPrice.value,cat:aCat.value,img:aImg.value||'Animal_Coloring.jpg'});localStorage.setItem('products',JSON.stringify(products));renderAdmin();renderProducts()}
+function del(i){products.splice(i,1);localStorage.setItem('products',JSON.stringify(products));renderAdmin();renderProducts()}
+
+const productsDiv=document.getElementById('products');renderProducts();
+
+let pressTimer;
+document.addEventListener('touchstart', startPress);
+document.addEventListener('mousedown', startPress);
+document.addEventListener('touchend', cancelPress);
+document.addEventListener('mouseup', cancelPress);
+function startPress(){ pressTimer=setTimeout(()=>{ showPage('adminLogin'); },5000); }
+function cancelPress(){ clearTimeout(pressTimer); }
+
+function sendOrder(){
+  if(cart.length===0){ alert('العربة فاضية'); return; }
+  let totalSum=cart.reduce((s,i)=>s+i.price,0);
+  let msg='🛒 طلب جديد من Book Bank\n';
+  cart.forEach(i=> msg+=`📘 ${i.name} - ${i.price} جنيه\n`);
+  msg+=`💰 الإجمالي: ${totalSum} جنيه\n`;
+  msg+=`👤 الاسم: ${name.value}\n`;
+  msg+=`📞 الهاتف: ${phone.value}\n`;
+  msg+=`📍 العنوان: ${address.value}`;
+  let ordersList=JSON.parse(localStorage.getItem('orders'))||[];
+  ordersList.push(msg);
+  localStorage.setItem('orders',JSON.stringify(ordersList));
+  window.open('https://wa.me/201000098207?text=' + encodeURIComponent(msg), '_blank');
+}
+</script>
+</body>
+</html>
